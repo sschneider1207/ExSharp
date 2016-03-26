@@ -74,9 +74,11 @@ namespace ExSharp
 
                 if (buf.SequenceEqual(_protoHeader))
                 {
-                    var lenBuf = ReadFromStdIn(4)
-                        .Reverse()
-                        .ToArray();
+                    var lenBuf = ReadFromStdIn(4);
+                    if(BitConverter.IsLittleEndian)
+                    {
+                        Array.Reverse(lenBuf);
+                    }                   
                     var len = BitConverter.ToInt32(lenBuf, 0);
 
                     var msgBuf = ReadFromStdIn(len);
