@@ -1,0 +1,30 @@
+syntax = "proto3";
+package ex_sharp;
+
+option csharp_namespace = "ExSharp.Protobuf";
+
+message ModuleSpec {
+  string name = 1;
+  
+  message Function {
+    string name = 1;
+    int32 arity = 2;
+  }
+  
+  repeated Function functions = 2;
+}
+
+message ModuleList {
+  repeated ModuleSpec modules = 1;
+}
+
+message FunctionCall {
+	string moduleName = 1;
+	string functionName = 2;
+	int32 argc = 3;
+	repeated bytes argv = 4;
+}
+
+message FunctionResult {
+	bytes value = 1;
+}
