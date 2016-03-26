@@ -7,7 +7,7 @@ using System.Reflection;
 
 namespace ExSharp
 {
-    public class ExSharpRunner
+    public class Runner
     {
         private IReadOnlyDictionary<ExSharpModuleAttribute, ExSharpFunctionAttribute[]> _moduleToFunctions;
         private IReadOnlyDictionary<string, IReadOnlyDictionary<string, MethodInfo>> _moduleNameToFunctionNameToMethod;
@@ -15,7 +15,7 @@ namespace ExSharp
         private static readonly byte[] _receiveModList = new byte[] {203, 61, 10, 114};
         private static readonly byte[] _protoHeader = new byte[] { 112, 198, 7, 27 };
 
-        public ExSharpRunner()
+        public Runner()
         {
             var typesToMethods = Assembly.GetCallingAssembly()
                 .GetTypes()
@@ -66,6 +66,34 @@ namespace ExSharp
             }
         }
 
+        private void Loop()
+        {
+            while (true)
+            {
+                var buf = ReadFromStdIn(4);
+
+                if (buf.SequenceEqual(_protoHeader))
+                {
+                    var lenBuf = ReadFromStdIn(4)
+                        .Reverse()
+                        .ToArray();
+                    var len = BitConverter.ToInt32(lenBuf, 0);
+
+                    var msgBuf = ReadFromStdIn(len);
+                    var funCall = FunctionCall.Parser.ParseFrom(msgBuf);
+
+                    var method = GetMethod(funCall.ModuleName, funCall.FunctionName, funCall.Argc);
+                    var argv = funCall.Argv.Select(ElixirTerm.FromByteString)
+                        .ToArray();
+
+                    var termResult = (ElixirTerm)method.Invoke(null, new object[] { argv, funCall.Argc });
+                    ElixirTerm.ToFunctionResult(termResult)
+                        .WriteToStdOut();
+                }
+                System.Threading.Thread.Sleep(50);
+            }
+        }
+
         private byte[] ReadFromStdIn(int length)
         {
             var buf = new byte[length];
@@ -89,35 +117,7 @@ namespace ExSharp
                 return mspec;
             }));
             return list;
-        }
-
-        private void Loop()
-        {
-            while(true)
-            {
-                var buf = ReadFromStdIn(4);
-
-                if(buf.SequenceEqual(_protoHeader))
-                {
-                    var lenBuf = ReadFromStdIn(4)
-                        .Reverse()
-                        .ToArray();
-                    var len = BitConverter.ToInt32(lenBuf, 0);
-
-                    var msgBuf = ReadFromStdIn(len);
-                    var funCall = FunctionCall.Parser.ParseFrom(msgBuf);
-                    
-                    var method = GetMethod(funCall.ModuleName, funCall.FunctionName, funCall.Argc);
-                    var argv = funCall.Argv.Select(ElixirTerm.FromByteString)
-                        .ToArray();
-
-                    var termResult = (ElixirTerm)method.Invoke(null, new object[] { argv, funCall.Argc });
-                    ElixirTerm.ToFunctionResult(termResult)
-                        .WriteToStdOut();
-                }
-                System.Threading.Thread.Sleep(50);                
-            }
-        } 
+        }        
         
         private MethodInfo GetMethod(string moduleName, string functionName, int arity)
         {
