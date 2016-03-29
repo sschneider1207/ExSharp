@@ -1,6 +1,7 @@
 ﻿using ExSharp.Protobuf;
 using Google.Protobuf;
 using System;
+using System.Linq;
 using System.Text;
 
 namespace ExSharp
@@ -38,23 +39,36 @@ namespace ExSharp
 
         private ElixirTerm(byte[] bytes)
         {
+            if(bytes == null)
+            {
+                throw new ArgumentNullException(nameof(bytes));
+            }
+
             if(bytes.Length < 2)
             {
                 throw new ArgumentOutOfRangeException(nameof(bytes), "Erlang term format requires a minimum of two bytes.");
             }
 
-            if(bytes[0] != _termIdentifier)
+            int sourceIndex;
+            int length;
+            if(bytes[0] == _termIdentifier)
             {
-                throw new ArgumentException(nameof(bytes), $"Erlang term format requires an identifier of <<{_termIdentifier}>> at position 0.");
+                sourceIndex = 1;
+                length = bytes.Length - 1;
             }
-
-            _bytes = bytes;
-            Tag = (TagType) bytes[1];
+            else
+            {
+                sourceIndex = 0;
+                length = bytes.Length;                
+            }
+            Tag = (TagType)bytes[sourceIndex];
+            _bytes = new byte[length];
+            Array.Copy(bytes, sourceIndex, _bytes, 0, length);
         }
 
         internal static ElixirTerm FromByteString(ByteString bytes) => new ElixirTerm(bytes.ToByteArray());
 
-        internal static FunctionResult ToFunctionResult(ElixirTerm term) => new FunctionResult { Value = ByteString.CopyFrom(term._bytes) };
+        internal static FunctionResult ToFunctionResult(ElixirTerm term) => new FunctionResult { Value = ByteString.CopyFrom(new byte[] { _termIdentifier }.Concat(term._bytes).ToArray()) };
         
         #region Get
         public static byte GetByte(ElixirTerm term) => term.Tag == TagType.BYTE ? term._bytes[2] : (byte)0;
@@ -67,7 +81,7 @@ namespace ExSharp
             }
 
             var buf = new byte[4];
-            Array.Copy(term._bytes, 2, buf, 0, 4);
+            Array.Copy(term._bytes, 1, buf, 0, 4);
 
             if(BitConverter.IsLittleEndian)
             {
@@ -85,7 +99,7 @@ namespace ExSharp
             }
 
             var buf = new byte[8];
-            Array.Copy(term._bytes, 2, buf, 0, 8);
+            Array.Copy(term._bytes, 1, buf, 0, 8);
 
             if (BitConverter.IsLittleEndian)
             {
@@ -103,7 +117,7 @@ namespace ExSharp
             }
 
             var len = new byte[2];
-            Array.Copy(term._bytes, 2, len, 0, 2);
+            Array.Copy(term._bytes, 1, len, 0, 2);
 
             if(BitConverter.IsLittleEndian)
             {
@@ -113,7 +127,7 @@ namespace ExSharp
             var atomLen = BitConverter.ToInt16(len, 0);
 
             var atomBuf = new byte[atomLen];
-            Array.Copy(term._bytes, 4, atomBuf, 0, atomLen);
+            Array.Copy(term._bytes, 3, atomBuf, 0, atomLen);
 
             return _latinEncoding.GetString(atomBuf, 0, atomLen);
         }
@@ -126,7 +140,7 @@ namespace ExSharp
             }
 
             var len = new byte[4];
-            Array.Copy(term._bytes, 2, len, 0, 4);
+            Array.Copy(term._bytes, 1, len, 0, 4);
 
             if (BitConverter.IsLittleEndian)
             {
@@ -136,14 +150,68 @@ namespace ExSharp
             var stringLen = BitConverter.ToInt32(len, 0);
 
             var stringBuf = new byte[stringLen];
-            Array.Copy(term._bytes, 6, stringBuf, 0, stringLen);
+            Array.Copy(term._bytes, 5, stringBuf, 0, stringLen);
 
             return Encoding.UTF8.GetString(stringBuf, 0, stringLen);
+        }
+        
+        public static PID GetPID(ElixirTerm term)
+        {
+            if(term.Tag != TagType.PID)
+            {
+                return new PID();
+            }
+
+            string node;
+            int curIndex = 1; // PID tag
+            if(term._bytes[curIndex] == (byte)TagType.ATOM)
+            {
+                curIndex = curIndex + 1;
+                var len = new byte[2];
+                Array.Copy(term._bytes, curIndex, len, 0, 2);
+                if(BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(len);
+                }
+
+                curIndex = curIndex + 2;
+                var nodeLen = BitConverter.ToInt16(len, 0);
+                var nodeBuf = new byte[nodeLen];
+                Array.Copy(term._bytes, curIndex, nodeBuf, 0, nodeLen);
+
+                node = _latinEncoding.GetString(nodeBuf, 0, nodeLen);
+                curIndex = curIndex + nodeLen; // PID tag, ATOM tag, ATOM len, ATOM buf
+            }
+            else
+            {
+                return new PID();
+            }
+            
+            var idBuf = new byte[4];
+            Array.Copy(term._bytes, curIndex, idBuf, 0, 4);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(idBuf);
+            }
+            var id = BitConverter.ToInt32(idBuf, 0);
+
+            curIndex = curIndex + 4;
+            var serialBuf = new byte[4];
+            Array.Copy(term._bytes, curIndex, serialBuf, 0, 4);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(idBuf);
+            }
+            var serial = BitConverter.ToInt32(serialBuf, 0);
+
+            curIndex = curIndex + 4;
+            var creation = term._bytes[curIndex];
+            return new PID(node, id, serial, creation);
         }
         #endregion Get
 
         #region Make
-        public static ElixirTerm MakeByte(byte val) => new ElixirTerm(new byte[] { _termIdentifier, (byte)TagType.BYTE, val });
+        public static ElixirTerm MakeByte(byte val) => new ElixirTerm(new byte[] {(byte)TagType.BYTE, val });
 
         public static ElixirTerm MakeInt(int val)
         {
@@ -152,10 +220,9 @@ namespace ExSharp
             {
                 Array.Reverse(buf);
             }
-            var termBuf = new byte[6];
-            termBuf[0] = _termIdentifier;
-            termBuf[1] = (byte)TagType.INT;
-            Array.Copy(buf, 0, termBuf, 2, 4);
+            var termBuf = new byte[5];
+            termBuf[0] = (byte)TagType.INT;
+            Array.Copy(buf, 0, termBuf, 1, 4);
             return new ElixirTerm(termBuf);
         }
 
@@ -166,10 +233,9 @@ namespace ExSharp
             {
                 Array.Reverse(buf);
             }
-            var termBuf = new byte[10];
-            termBuf[0] = _termIdentifier;
-            termBuf[1] = (byte)TagType.NEW_FLOAT;
-            Array.Copy(buf, 0, termBuf, 2, 8);
+            var termBuf = new byte[9];
+            termBuf[0] = (byte)TagType.NEW_FLOAT;
+            Array.Copy(buf, 0, termBuf, 1, 8);
             return new ElixirTerm(termBuf);
         }
 
@@ -186,11 +252,10 @@ namespace ExSharp
             {
                 Array.Reverse(len);
             }
-            var termBuf = new byte[4 + atomLen];
-            termBuf[0] = _termIdentifier;
-            termBuf[1] = (byte)TagType.ATOM;
-            Array.Copy(len, 0, termBuf, 2, 2);
-            Array.Copy(buf, 0, termBuf, 4, atomLen);
+            var termBuf = new byte[3 + atomLen];
+            termBuf[0] = (byte)TagType.ATOM;
+            Array.Copy(len, 0, termBuf, 1, 2);
+            Array.Copy(buf, 0, termBuf, 3, atomLen);
             return new ElixirTerm(termBuf);
         }
 
@@ -203,12 +268,43 @@ namespace ExSharp
             {
                 Array.Reverse(len);
             }
-            var termBuf = new byte[6 + stringLen];
-            termBuf[0] = _termIdentifier;
-            termBuf[1] = (byte)TagType.BINARY;
-            Array.Copy(len, 0, termBuf, 2, 4);
-            Array.Copy(buf, 0, termBuf, 6, stringLen);
+            var termBuf = new byte[5 + stringLen];
+            termBuf[0] = (byte)TagType.BINARY;
+            Array.Copy(len, 0, termBuf, 1, 4);
+            Array.Copy(buf, 0, termBuf, 5, stringLen);
             return new ElixirTerm(termBuf);
+        }
+
+        public static ElixirTerm MakePID(PID pid)
+        {
+            var atom = MakeAtom(pid.Node);
+            var len = 1 + atom._bytes.Length + 4 + 4 + 1; // tag, atom, id, serial, creation
+            var termBuff = new byte[len];
+            int curIndex = 0;
+            termBuff[curIndex] = (byte)TagType.PID;
+
+            curIndex = curIndex + 1;
+            Array.Copy(atom._bytes, 0, termBuff, curIndex, atom._bytes.Length);
+
+            curIndex = curIndex + atom._bytes.Length;
+            var idBuf = BitConverter.GetBytes(pid.ID);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(idBuf);
+            }
+            Array.Copy(idBuf, 0, termBuff, curIndex, 4);
+
+            curIndex = curIndex + 4;
+            var serialBuf = BitConverter.GetBytes(pid.Serial);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(serialBuf);
+            }
+            Array.Copy(serialBuf, 0, termBuff, curIndex, 4);
+
+            curIndex = curIndex + 4;
+            termBuff[curIndex] = pid.Creation;
+            return new ElixirTerm(termBuff);
         }
         #endregion Make        
     }
