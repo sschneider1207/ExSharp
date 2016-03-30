@@ -49,6 +49,7 @@
     <Compile Include="PID.cs" />
     <Compile Include="Protobuf\ExSharp.cs" />
     <Compile Include="ExSharpModuleAttribute.cs" />
+    <Compile Include="Reference.cs" />
     <Compile Include="Runner.cs" />
     <Compile Include="ExSharpFunctionAttribute.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

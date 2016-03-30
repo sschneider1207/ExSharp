@@ -163,7 +163,7 @@ namespace ExSharp
             }
 
             string node;
-            int curIndex = 1; // PID tag
+            int curIndex = 1;
             if(term._bytes[curIndex] == (byte)TagType.ATOM)
             {
                 curIndex = curIndex + 1;
@@ -180,7 +180,7 @@ namespace ExSharp
                 Array.Copy(term._bytes, curIndex, nodeBuf, 0, nodeLen);
 
                 node = _latinEncoding.GetString(nodeBuf, 0, nodeLen);
-                curIndex = curIndex + nodeLen; // PID tag, ATOM tag, ATOM len, ATOM buf
+                curIndex = curIndex + nodeLen;
             }
             else
             {
@@ -200,13 +200,73 @@ namespace ExSharp
             Array.Copy(term._bytes, curIndex, serialBuf, 0, 4);
             if (BitConverter.IsLittleEndian)
             {
-                Array.Reverse(idBuf);
+                Array.Reverse(serialBuf);
             }
             var serial = BitConverter.ToInt32(serialBuf, 0);
 
             curIndex = curIndex + 4;
             var creation = term._bytes[curIndex];
             return new PID(node, id, serial, creation);
+        }
+
+        public static Reference GetReference(ElixirTerm term)
+        {
+            if (term.Tag != TagType.NEW_REFERENCE)
+            {
+                return new Reference();
+            }
+
+            var curIndex = 1;
+            var lenBuf = new byte[2];
+            Array.Copy(term._bytes, curIndex, lenBuf, 0, 2);
+            if(BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(lenBuf);
+            }
+            var len = BitConverter.ToInt16(lenBuf, 0);
+
+            curIndex = curIndex + 2;
+            string node;
+            if (term._bytes[curIndex] == (byte)TagType.ATOM)
+            {
+                curIndex = curIndex + 1;
+                var nodeLenBuf = new byte[2];
+                Array.Copy(term._bytes, curIndex, nodeLenBuf, 0, 2);
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(nodeLenBuf);
+                }
+
+                curIndex = curIndex + 2;
+                var nodeLen = BitConverter.ToInt16(nodeLenBuf, 0);
+                var nodeBuf = new byte[nodeLen];
+                Array.Copy(term._bytes, curIndex, nodeBuf, 0, nodeLen);
+
+                node = _latinEncoding.GetString(nodeBuf, 0, nodeLen);
+                curIndex = curIndex + nodeLen;
+            }
+            else
+            {
+                return new Reference();
+            }
+
+            byte creation = term._bytes[curIndex];
+
+            curIndex = curIndex + 1;
+            var id = new int[len];
+            for(var i = 0; i < len; i++, curIndex = curIndex + 4)
+            {
+                var idBuf = new byte[4];
+                Array.Copy(term._bytes, curIndex, idBuf, 0, 4);
+                if(BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(idBuf);
+                }
+
+                id[i] = BitConverter.ToInt32(idBuf, 0);
+            }
+
+            return new Reference(node, creation, id);
         }
         #endregion Get
 
