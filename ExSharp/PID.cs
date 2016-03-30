@@ -15,11 +15,6 @@
             Creation = creation;
         }
 
-        internal PID()
-        {
-            Node = string.Empty;
-        }
-
         public override string ToString() => $"#PID<{Creation}.{ID}.{Serial}>";
 
         public override bool Equals(object obj)

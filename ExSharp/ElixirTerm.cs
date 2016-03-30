@@ -71,13 +71,13 @@ namespace ExSharp
         internal static FunctionResult ToFunctionResult(ElixirTerm term) => new FunctionResult { Value = ByteString.CopyFrom(new byte[] { _termIdentifier }.Concat(term._bytes).ToArray()) };
         
         #region Get
-        public static byte GetByte(ElixirTerm term) => term.Tag == TagType.BYTE ? term._bytes[2] : (byte)0;
+        public static byte? GetByte(ElixirTerm term) => term.Tag == TagType.BYTE ? (byte?)term._bytes[2] : null;
 
-        public static int GetInt(ElixirTerm term)
+        public static int? GetInt(ElixirTerm term)
         {
             if(term.Tag != TagType.INT)
             {
-                return 0;
+                return null;
             }
 
             var buf = new byte[4];
@@ -91,11 +91,11 @@ namespace ExSharp
             return BitConverter.ToInt32(buf, 0);
         }
         
-        public static double GetDouble(ElixirTerm term)
+        public static double? GetDouble(ElixirTerm term)
         {
             if (term.Tag != TagType.NEW_FLOAT)
             {
-                return 0d;
+                return null;
             }
 
             var buf = new byte[8];
@@ -113,7 +113,7 @@ namespace ExSharp
         {
             if(term.Tag != TagType.ATOM)
             {
-                return string.Empty;
+                return null;
             }
 
             var len = new byte[2];
@@ -136,7 +136,7 @@ namespace ExSharp
         {
             if(term.Tag != TagType.BINARY)
             {
-                return string.Empty;
+                return null;
             }
 
             var len = new byte[4];
@@ -159,7 +159,7 @@ namespace ExSharp
         {
             if(term.Tag != TagType.PID)
             {
-                return new PID();
+                return null;
             }
 
             string node;
@@ -184,7 +184,7 @@ namespace ExSharp
             }
             else
             {
-                return new PID();
+                return null;
             }
             
             var idBuf = new byte[4];
@@ -213,7 +213,7 @@ namespace ExSharp
         {
             if (term.Tag != TagType.NEW_REFERENCE)
             {
-                return new Reference();
+                return null;
             }
 
             var curIndex = 1;
@@ -247,7 +247,7 @@ namespace ExSharp
             }
             else
             {
-                return new Reference();
+                return null;
             }
 
             byte creation = term._bytes[curIndex];
@@ -268,6 +268,8 @@ namespace ExSharp
 
             return new Reference(node, creation, id);
         }
+
+        public static EmptyList GetEmptyList(ElixirTerm term) => term.Tag == TagType.EMPTY_LIST ? new EmptyList() : null;
         #endregion Get
 
         #region Make
@@ -401,6 +403,8 @@ namespace ExSharp
             }
             return new ElixirTerm(termBuf);
         }
+
+        public static ElixirTerm MakeEmptyList() => new ElixirTerm(new byte[] { (byte)TagType.EMPTY_LIST });
         #endregion Make        
     }
 }

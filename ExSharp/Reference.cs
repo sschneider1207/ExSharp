@@ -15,12 +15,6 @@ namespace ExSharp
             ID = id;
         }
 
-        internal Reference()
-        {
-            Node = string.Empty;
-            ID = new int[0];
-        }
-
         public override string ToString() => $"#Reference<{Creation}.{string.Join(".", ID.Reverse().Select(i => i.ToString()))}>";
 
         public override bool Equals(object obj)
