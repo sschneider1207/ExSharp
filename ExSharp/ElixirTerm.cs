@@ -366,6 +366,41 @@ namespace ExSharp
             termBuff[curIndex] = pid.Creation;
             return new ElixirTerm(termBuff);
         }
+
+        public static ElixirTerm MakeRef(Reference @ref)
+        {
+            var atom = MakeAtom(@ref.Node);
+            var len = 1 + 2 + atom._bytes.Length + 1 + (4 * @ref.ID.Length);
+            var termBuf = new byte[len];
+            int curIndex = 0;
+            termBuf[curIndex] = (byte)TagType.NEW_REFERENCE;
+
+            curIndex = curIndex + 1;
+            var lenBuf = BitConverter.GetBytes((short)@ref.ID.Length);
+            if(BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(lenBuf);
+            }
+            Array.Copy(lenBuf, 0, termBuf, curIndex, 2);
+
+            curIndex = curIndex + 2;
+            Array.Copy(atom._bytes, 0, termBuf, curIndex, atom._bytes.Length);
+
+            curIndex = curIndex + atom._bytes.Length;
+            termBuf[curIndex] = @ref.Creation;
+
+            curIndex = curIndex + 1;
+            for(var i = 0; i < @ref.ID.Length; i++, curIndex = curIndex + 4)
+            {
+                var idBuf = BitConverter.GetBytes(@ref.ID[i]);
+                if(BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(idBuf);
+                }                
+                Array.Copy(idBuf, 0, termBuf, curIndex, 4);
+            }
+            return new ElixirTerm(termBuf);
+        }
         #endregion Make        
     }
 }
