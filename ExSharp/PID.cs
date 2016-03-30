@@ -19,5 +19,26 @@
         {
             Node = string.Empty;
         }
+
+        public override string ToString() => $"#PID<{Creation}.{ID}.{Serial}>";
+
+        public override bool Equals(object obj)
+        {
+            if(obj == null)
+            {
+                return false;
+            }
+
+            var pid = (PID)obj;
+
+            if(pid == null)
+            {
+                return false;
+            }
+
+            return Node == pid.Node && ID == pid.ID && Serial == pid.Serial && Creation == pid.Creation;
+        }
+
+        public override int GetHashCode() => Node.GetHashCode() >> ID >> Serial >> Creation;
     }
 }
