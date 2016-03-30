@@ -1,6 +1,7 @@
 ﻿using ExSharp.Protobuf;
 using Google.Protobuf;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -44,9 +45,9 @@ namespace ExSharp
                 throw new ArgumentNullException(nameof(bytes));
             }
 
-            if(bytes.Length < 2)
+            if(bytes.Length < 1)
             {
-                throw new ArgumentOutOfRangeException(nameof(bytes), "Erlang term format requires a minimum of two bytes.");
+                throw new ArgumentOutOfRangeException(nameof(bytes), "Erlang term format requires a minimum of one byte.");
             }
 
             int sourceIndex;
@@ -270,6 +271,145 @@ namespace ExSharp
         }
 
         public static EmptyList GetEmptyList(ElixirTerm term) => term.Tag == TagType.EMPTY_LIST ? new EmptyList() : null;
+        
+        public static Tuple GetTuple(ElixirTerm term)
+        {
+            if(term.Tag == TagType.SMALL_TUPLE)
+            {
+                return GetSmallTuple(term);
+            }
+            if(term.Tag == TagType.LARGE_TUPLE)
+            {
+                return GetBigTuple(term);
+            }
+            return null;
+        }
+
+        private static Tuple GetSmallTuple(ElixirTerm term)
+        {
+            var curIndex = 1;
+            var arity = term._bytes[curIndex];
+            var elements = new ElixirTerm[arity];
+
+            curIndex = curIndex + 1;
+            for(var i = 0; i < arity; i++)
+            {
+                elements[i] = GetNextTerm(ref curIndex, term);
+            }
+            return new Tuple(arity, elements);
+        }
+
+        private static Tuple GetBigTuple(ElixirTerm term)
+        {
+            var curIndex = 1;
+            var arityBuf = new byte[4];
+            Array.Copy(term._bytes, curIndex, arityBuf, 0, 4);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(arityBuf);
+            }
+
+            var arity = BitConverter.ToInt32(arityBuf, 0);
+            var elements = new ElixirTerm[arity];
+
+            curIndex = curIndex + 1;
+            for (var i = 0; i < arity; i++)
+            {
+                elements[i] = GetNextTerm(ref curIndex, term);
+            }
+            return new Tuple(arity, elements);
+        }
+
+        private static ElixirTerm GetNextTerm(ref int curIndex, ElixirTerm term)
+        {
+            var tag = (TagType)term._bytes[curIndex];
+            int termLength;
+            switch(tag)
+            {
+                case TagType.BYTE:
+                    termLength = 2;
+                    break;
+                case TagType.INT:
+                    termLength = 5;
+                    break;
+                case TagType.NEW_FLOAT:
+                    termLength = 9;
+                    break;
+                case TagType.ATOM:
+                    {
+                        var lenBuf = new byte[2];
+                        Array.Copy(term._bytes, curIndex + 1, lenBuf, 0, 2);
+                        if (BitConverter.IsLittleEndian)
+                        {
+                            Array.Reverse(lenBuf);
+                        }
+                        var len = BitConverter.ToInt16(lenBuf, 0);
+                        termLength = len + 3;
+                        break;
+                    }
+                case TagType.BINARY:
+                    {
+                        var lenBuf = new byte[4];
+                        Array.Copy(term._bytes, curIndex + 1, lenBuf, 0, 4);
+                        if (BitConverter.IsLittleEndian)
+                        {
+                            Array.Reverse(lenBuf);
+                        }
+                        var len = BitConverter.ToInt32(lenBuf, 0);
+                        termLength = len + 5;
+                        break;
+                    }
+                case TagType.PID:
+                    {
+                        var lenBuf = new byte[2];
+                        Array.Copy(term._bytes, curIndex + 2, lenBuf, 0, 2);
+                        if (BitConverter.IsLittleEndian)
+                        {
+                            Array.Reverse(lenBuf);
+                        }
+                        var len = BitConverter.ToInt16(lenBuf, 0);
+                        var nodeLen = len + 3;
+                        termLength = nodeLen + 10;
+                        break;
+                    }
+                case TagType.NEW_REFERENCE:
+                    {
+                        var tempLen = 0;
+                        {
+                            var lenBuf = new byte[2];
+                            Array.Copy(term._bytes, curIndex + 1, lenBuf, 0, 2);
+                            if (BitConverter.IsLittleEndian)
+                            {
+                                Array.Reverse(lenBuf);
+                            }
+                            var len = BitConverter.ToInt16(lenBuf, 0);
+                            tempLen = tempLen + 4 + (4 * len);
+                        }
+                        {
+                            var lenBuf = new byte[2];
+                            Array.Copy(term._bytes, curIndex + 4, lenBuf, 0, 2);
+                            if (BitConverter.IsLittleEndian)
+                            {
+                                Array.Reverse(lenBuf);
+                            }
+                            var len = BitConverter.ToInt16(lenBuf, 0);
+                            var nodeLen = len + 3;
+                            tempLen = tempLen + nodeLen;
+                        }
+                        termLength = tempLen;
+                        break;
+                    }
+                case TagType.EMPTY_LIST:
+                    termLength = 1;
+                    break;
+                default:
+                    return null;
+            }
+            var termBuf = new byte[termLength];
+            Array.Copy(term._bytes, curIndex, termBuf, 0, termLength);
+            curIndex = curIndex + termLength;
+            return new ElixirTerm(termBuf);
+        }
         #endregion Get
 
         #region Make
@@ -405,6 +545,34 @@ namespace ExSharp
         }
 
         public static ElixirTerm MakeEmptyList() => new ElixirTerm(new byte[] { (byte)TagType.EMPTY_LIST });
+
+        public static ElixirTerm MakeTuple(ElixirTerm[] elements) => elements.Length <= 255 ? MakeSmallTuple(elements) : MakeBigTuple(elements);
+
+        private static ElixirTerm MakeSmallTuple(ElixirTerm[] elements)
+        {
+            IEnumerable<byte> buf = new byte[] { 104, (byte)elements.Length };
+            foreach(var elem in elements)
+            {
+                buf = buf.Concat(elem._bytes);
+            }
+            return new ElixirTerm(buf.ToArray());
+        }
+
+        private static ElixirTerm MakeBigTuple(ElixirTerm[] elements)
+        {
+            var arityBuf = BitConverter.GetBytes(elements.Length);
+            if(BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(arityBuf);
+            }
+
+            IEnumerable<byte> buf = new byte[] { 105, }.Concat(arityBuf);
+            foreach (var elem in elements)
+            {
+                buf = buf.Concat(elem._bytes);
+            }
+            return new ElixirTerm(buf.ToArray());
+        }
         #endregion Make        
     }
 }

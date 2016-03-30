@@ -54,6 +54,7 @@
     <Compile Include="Runner.cs" />
     <Compile Include="ExSharpFunctionAttribute.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Tuple.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ExSharp.proto" />
