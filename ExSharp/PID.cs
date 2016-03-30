@@ -7,7 +7,7 @@
         public int Serial { get; }
         public byte Creation { get; }
 
-        public PID(string node, int id, int serial, byte creation)
+        internal PID(string node, int id, int serial, byte creation)
         {
             Node = node;
             ID = id;
