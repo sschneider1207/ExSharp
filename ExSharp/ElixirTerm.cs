@@ -546,7 +546,7 @@ namespace ExSharp
 
         public static ElixirTerm MakeEmptyList() => new ElixirTerm(new byte[] { (byte)TagType.EMPTY_LIST });
 
-        public static ElixirTerm MakeTuple(ElixirTerm[] elements) => elements.Length <= 255 ? MakeSmallTuple(elements) : MakeBigTuple(elements);
+        public static ElixirTerm MakeTuple(ElixirTerm[] elements) => elements.Length <= byte.MaxValue ? MakeSmallTuple(elements) : MakeBigTuple(elements);
 
         private static ElixirTerm MakeSmallTuple(ElixirTerm[] elements)
         {

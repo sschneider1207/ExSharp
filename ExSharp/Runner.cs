@@ -12,8 +12,9 @@ namespace ExSharp
         private IReadOnlyDictionary<ExSharpModuleAttribute, ExSharpFunctionAttribute[]> _moduleToFunctions;
         private IReadOnlyDictionary<string, IReadOnlyDictionary<string, MethodInfo>> _moduleNameToFunctionNameToMethod;
 
+        private static readonly byte[] _startSignal = new byte[] { 37, 10, 246, 113 };
         private static readonly byte[] _receiveModList = new byte[] {203, 61, 10, 114};
-        private static readonly byte[] _protoHeader = new byte[] { 112, 198, 7, 27 };
+        private static readonly byte[] _protoHeader = new byte[] { 112, 198, 7, 27 };        
 
         public Runner()
         {
@@ -22,7 +23,7 @@ namespace ExSharp
                 .Where(t => t.GetCustomAttribute<ExSharpModuleAttribute>(false) != null)
                 .ToDictionary(t => t, t => t.GetMethods()
                                             .Where(m => m.GetCustomAttribute<ExSharpFunctionAttribute>(false) != null)
-                                            .Where(m => m.ReturnType == typeof(ElixirTerm))
+                                            .Where(m => m.ReturnType == typeof(ElixirTerm) || m.ReturnType == typeof(void))
                                             .ToArray());
 
             var functionsToMethods = typesToMethods.Values.SelectMany(ms =>
@@ -45,8 +46,17 @@ namespace ExSharp
 
         public void Run()
         {
+            SignalStarted();
             WaitForReadySignal();
             Loop();
+        }
+
+        private void SignalStarted()
+        {
+            using(var @out = Console.OpenStandardOutput(4))
+            {
+                @out.Write(_startSignal, 0, 4);
+            }
         }
 
         private void WaitForReadySignal()
@@ -88,7 +98,33 @@ namespace ExSharp
                     var argv = funCall.Argv.Select(ElixirTerm.FromByteString)
                         .ToArray();
 
-                    var termResult = (ElixirTerm)method.Invoke(null, new object[] { argv, funCall.Argc });
+                    ElixirTerm termResult;
+                    try
+                    {
+                        termResult = (ElixirTerm)method.Invoke(null, new object[] { argv, funCall.Argc });
+                    }
+                    catch (Exception e) when (e.InnerException != null)
+                    {
+                        termResult = ElixirTerm.MakeTuple(new ElixirTerm[]
+                        {
+                            ElixirTerm.MakeAtom("exception"),
+                            ElixirTerm.MakeUTF8String(e.InnerException.Message)
+                        });
+                    }
+                    catch (Exception e)
+                    {
+                        termResult = ElixirTerm.MakeTuple(new ElixirTerm[]
+                        {
+                            ElixirTerm.MakeAtom("exception"),
+                            ElixirTerm.MakeUTF8String(e.Message)
+                        });
+                    }
+
+                    if(termResult == null)
+                    {
+                        termResult = ElixirTerm.MakeAtom("ok");
+                    }
+
                     ElixirTerm.ToFunctionResult(termResult)
                         .WriteToStdOut();
                 }
