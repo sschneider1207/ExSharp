@@ -1,5 +1,4 @@
 ﻿using ExSharp.Protobuf;
-using Google.Protobuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -69,7 +68,7 @@ namespace ExSharp
                 
                 if (buf.SequenceEqual(_receiveModList))
                 {
-                    modList.WriteToStdOut();
+                    modList.WriteProto();
                     return;
                 }
                 System.Threading.Thread.Sleep(50);
@@ -126,21 +125,13 @@ namespace ExSharp
                     }
 
                     ElixirTerm.ToFunctionResult(termResult)
-                        .WriteToStdOut();
+                        .WriteProto();
                 }
                 System.Threading.Thread.Sleep(50);
             }
         }
 
-        private byte[] ReadFromStdIn(int length)
-        {
-            var buf = new byte[length];
-            using (var @in = Console.OpenStandardInput(length))
-            {
-                @in.Read(buf, 0, length);
-                return buf;
-            }
-        }
+        
 
         private ModuleList BuildModuleList()
         {
@@ -167,6 +158,22 @@ namespace ExSharp
 
             MethodInfo function;
             return functions.TryGetValue(ExSharpFunctionAttribute.GenFullName(functionName, arity), out function) ? function : null;
-        }       
+        }
+
+        private static byte[] ReadFromStdIn(int length)
+        {
+            var buf = new byte[length];
+            using (var @in = Console.OpenStandardInput(length))
+            {
+                @in.Read(buf, 0, length);
+                return buf;
+            }
+        }
+
+        public static void ElixirCallback(ElixirTerm fun, ElixirTerm[] args)
+        {
+            var callback = ElixirTerm.ToElixirCallback(fun, args);
+            callback.WriteCallback();
+        }
     }
 }

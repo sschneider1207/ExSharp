@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="ElixirTerm.cs" />
     <Compile Include="EmptyList.cs" />
+    <Compile Include="Export.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="PID.cs" />
     <Compile Include="Protobuf\ExSharp.cs" />

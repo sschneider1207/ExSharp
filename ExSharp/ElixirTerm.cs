@@ -28,6 +28,8 @@ namespace ExSharp
             BINARY = 109,
             SMALL_BIG = 110,
             LARGE_BIG = 111,
+            NEW_FUN = 112,
+            EXPORT = 113,
             NEW_REFERENCE = 114,
             SMALL_ATOM = 115,
             NEW_FLOAT = 70,
@@ -71,8 +73,23 @@ namespace ExSharp
 
         internal static FunctionResult ToFunctionResult(ElixirTerm term) => new FunctionResult { Value = ByteString.CopyFrom(new byte[] { _termIdentifier }.Concat(term._bytes).ToArray()) };
         
+        internal static ElixirCallback ToElixirCallback(ElixirTerm fun, ElixirTerm[] args)
+        {
+            if (fun.Tag != TagType.NEW_FUN && fun.Tag != TagType.EXPORT)
+            {
+                throw new ArgumentException(nameof(fun), "Term must be a NEW_FUN or EXPORT");
+            }
+
+            var callback = new ElixirCallback
+            {
+                Fun = ByteString.CopyFrom(new byte[] { _termIdentifier }.Concat(fun._bytes).ToArray())
+            };
+            callback.Args.Add(args.Select(b => new byte[] { _termIdentifier }.Concat(fun._bytes).ToArray()).Select(ByteString.CopyFrom));
+
+            return callback;
+        }
         #region Get
-        public static byte? GetByte(ElixirTerm term) => term.Tag == TagType.BYTE ? (byte?)term._bytes[2] : null;
+        public static byte? GetByte(ElixirTerm term) => term.Tag == TagType.BYTE ? (byte?)term._bytes[1] : null;
 
         public static int? GetInt(ElixirTerm term)
         {
@@ -367,6 +384,25 @@ namespace ExSharp
             curIndex = curIndex + 2;
             Array.Copy(term._bytes, curIndex, bytes, 0, length);
             return bytes;
+        }
+
+        public static Export GetExport(ElixirTerm term)
+        {
+            if(term.Tag != TagType.EXPORT)
+            {
+                return null;
+            }
+
+            int curIndex = 1;
+            var moduleAtom = GetNextTerm(ref curIndex, term);
+            var funAtom = GetNextTerm(ref curIndex, term);
+            var arityByte = GetNextTerm(ref curIndex, term);
+
+            var module = GetAtom(moduleAtom);
+            var fun = GetAtom(funAtom);
+            var arity = GetByte(arityByte) ?? 0;
+
+            return new Export(module, fun, arity);
         }
 
         private static ElixirTerm GetNextTerm(ref int curIndex, ElixirTerm term)

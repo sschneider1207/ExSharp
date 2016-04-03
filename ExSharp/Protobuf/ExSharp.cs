@@ -30,6 +30,7 @@ namespace ExSharp.Protobuf {
             "X3NoYXJwLk1vZHVsZVNwZWMiVAoMRnVuY3Rpb25DYWxsEhIKCm1vZHVsZU5h",
             "bWUYASABKAkSFAoMZnVuY3Rpb25OYW1lGAIgASgJEgwKBGFyZ2MYAyABKAUS",
             "DAoEYXJndhgEIAMoDCIfCg5GdW5jdGlvblJlc3VsdBINCgV2YWx1ZRgBIAEo",
+            "DCIrCg5FbGl4aXJDYWxsYmFjaxILCgNmdW4YASABKAwSDAoEYXJncxgCIAMo",
             "DEITqgIQRXhTaGFycC5Qcm90b2J1ZmIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
@@ -37,7 +38,8 @@ namespace ExSharp.Protobuf {
             new pbr::GeneratedCodeInfo(typeof(global::ExSharp.Protobuf.ModuleSpec), global::ExSharp.Protobuf.ModuleSpec.Parser, new[]{ "Name", "Functions" }, null, null, new pbr::GeneratedCodeInfo[] { new pbr::GeneratedCodeInfo(typeof(global::ExSharp.Protobuf.ModuleSpec.Types.Function), global::ExSharp.Protobuf.ModuleSpec.Types.Function.Parser, new[]{ "Name", "Arity" }, null, null, null)}),
             new pbr::GeneratedCodeInfo(typeof(global::ExSharp.Protobuf.ModuleList), global::ExSharp.Protobuf.ModuleList.Parser, new[]{ "Modules" }, null, null, null),
             new pbr::GeneratedCodeInfo(typeof(global::ExSharp.Protobuf.FunctionCall), global::ExSharp.Protobuf.FunctionCall.Parser, new[]{ "ModuleName", "FunctionName", "Argc", "Argv" }, null, null, null),
-            new pbr::GeneratedCodeInfo(typeof(global::ExSharp.Protobuf.FunctionResult), global::ExSharp.Protobuf.FunctionResult.Parser, new[]{ "Value" }, null, null, null)
+            new pbr::GeneratedCodeInfo(typeof(global::ExSharp.Protobuf.FunctionResult), global::ExSharp.Protobuf.FunctionResult.Parser, new[]{ "Value" }, null, null, null),
+            new pbr::GeneratedCodeInfo(typeof(global::ExSharp.Protobuf.ElixirCallback), global::ExSharp.Protobuf.ElixirCallback.Parser, new[]{ "Fun", "Args" }, null, null, null)
           }));
     }
     #endregion
@@ -669,6 +671,128 @@ namespace ExSharp.Protobuf {
             break;
           case 10: {
             Value = input.ReadBytes();
+            break;
+          }
+        }
+      }
+    }
+
+  }
+
+  [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+  public sealed partial class ElixirCallback : pb::IMessage<ElixirCallback> {
+    private static readonly pb::MessageParser<ElixirCallback> _parser = new pb::MessageParser<ElixirCallback>(() => new ElixirCallback());
+    public static pb::MessageParser<ElixirCallback> Parser { get { return _parser; } }
+
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::ExSharp.Protobuf.ExSharpReflection.Descriptor.MessageTypes[4]; }
+    }
+
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    public ElixirCallback() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    public ElixirCallback(ElixirCallback other) : this() {
+      fun_ = other.fun_;
+      args_ = other.args_.Clone();
+    }
+
+    public ElixirCallback Clone() {
+      return new ElixirCallback(this);
+    }
+
+    /// <summary>Field number for the "fun" field.</summary>
+    public const int FunFieldNumber = 1;
+    private pb::ByteString fun_ = pb::ByteString.Empty;
+    public pb::ByteString Fun {
+      get { return fun_; }
+      set {
+        fun_ = pb::Preconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "args" field.</summary>
+    public const int ArgsFieldNumber = 2;
+    private static readonly pb::FieldCodec<pb::ByteString> _repeated_args_codec
+        = pb::FieldCodec.ForBytes(18);
+    private readonly pbc::RepeatedField<pb::ByteString> args_ = new pbc::RepeatedField<pb::ByteString>();
+    public pbc::RepeatedField<pb::ByteString> Args {
+      get { return args_; }
+    }
+
+    public override bool Equals(object other) {
+      return Equals(other as ElixirCallback);
+    }
+
+    public bool Equals(ElixirCallback other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Fun != other.Fun) return false;
+      if(!args_.Equals(other.args_)) return false;
+      return true;
+    }
+
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Fun.Length != 0) hash ^= Fun.GetHashCode();
+      hash ^= args_.GetHashCode();
+      return hash;
+    }
+
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    public void WriteTo(pb::CodedOutputStream output) {
+      if (Fun.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteBytes(Fun);
+      }
+      args_.WriteTo(output, _repeated_args_codec);
+    }
+
+    public int CalculateSize() {
+      int size = 0;
+      if (Fun.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Fun);
+      }
+      size += args_.CalculateSize(_repeated_args_codec);
+      return size;
+    }
+
+    public void MergeFrom(ElixirCallback other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Fun.Length != 0) {
+        Fun = other.Fun;
+      }
+      args_.Add(other.args_);
+    }
+
+    public void MergeFrom(pb::CodedInputStream input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            input.SkipLastField();
+            break;
+          case 10: {
+            Fun = input.ReadBytes();
+            break;
+          }
+          case 18: {
+            args_.AddEntriesFrom(input, _repeated_args_codec);
             break;
           }
         }
