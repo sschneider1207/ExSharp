@@ -320,6 +320,55 @@ namespace ExSharp
             return new Tuple(arity, elements);
         }
 
+        public static ElixirTerm[] GetList(ElixirTerm term)
+        {
+            if(term.Tag != TagType.LIST)
+            {
+                return new ElixirTerm[0];
+            }
+
+            var curIndex = 1;
+            var lenBuf = new byte[4];
+            Array.Copy(term._bytes, curIndex, lenBuf, 0, 4);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(lenBuf);
+            }
+
+            var length = BitConverter.ToInt32(lenBuf, 0) + 1;   // length does not include tail
+            var elements = new ElixirTerm[length];
+
+            curIndex = curIndex + 4;
+            for (var i = 0; i < length; i++)
+            {
+                elements[i] = GetNextTerm(ref curIndex, term);
+            }
+
+            return elements;
+        }
+
+        public static byte[] GetByteList(ElixirTerm term)
+        {
+            if(term.Tag != TagType.STRING)
+            {
+                return new byte[0];
+            }
+
+            var curIndex = 1;
+            var lenBuf = new byte[2];
+            Array.Copy(term._bytes, curIndex, lenBuf, 0, 2);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(lenBuf);
+            }
+
+            var length = BitConverter.ToInt16(lenBuf, 0);
+            var bytes = new byte[length];
+            curIndex = curIndex + 2;
+            Array.Copy(term._bytes, curIndex, bytes, 0, length);
+            return bytes;
+        }
+
         private static ElixirTerm GetNextTerm(ref int curIndex, ElixirTerm term)
         {
             var tag = (TagType)term._bytes[curIndex];
@@ -550,7 +599,7 @@ namespace ExSharp
 
         private static ElixirTerm MakeSmallTuple(ElixirTerm[] elements)
         {
-            IEnumerable<byte> buf = new byte[] { 104, (byte)elements.Length };
+            IEnumerable<byte> buf = new byte[] { (byte)TagType.SMALL_TUPLE, (byte)elements.Length };
             foreach(var elem in elements)
             {
                 buf = buf.Concat(elem._bytes);
@@ -566,11 +615,44 @@ namespace ExSharp
                 Array.Reverse(arityBuf);
             }
 
-            IEnumerable<byte> buf = new byte[] { 105, }.Concat(arityBuf);
+            IEnumerable<byte> buf = new byte[] { (byte)TagType.LARGE_TUPLE }.Concat(arityBuf);
             foreach (var elem in elements)
             {
                 buf = buf.Concat(elem._bytes);
             }
+            return new ElixirTerm(buf.ToArray());
+        }
+        
+        public static ElixirTerm MakeList(ElixirTerm[] elements)
+        {
+            var lenBuf = BitConverter.GetBytes(elements.Length - 1);    // length does not include tail
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(lenBuf);
+            }
+
+            IEnumerable<byte> buf = new byte[] { (byte)TagType.LIST }.Concat(lenBuf);
+            foreach (var elem in elements)
+            {
+                buf = buf.Concat(elem._bytes);
+            }
+            return new ElixirTerm(buf.ToArray());
+        }
+
+        public static ElixirTerm MakeByteList(byte[] bytes)
+        {
+            if(bytes.Length > short.MaxValue)
+            {
+                throw new ArgumentException(nameof(bytes), "Byte list too long, create regular list instead.");
+            }
+
+            var lenBuf = BitConverter.GetBytes((short)bytes.Length);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(lenBuf);
+            }
+
+            IEnumerable<byte> buf = new byte[] { (byte)TagType.STRING }.Concat(lenBuf).Concat(bytes);
             return new ElixirTerm(buf.ToArray());
         }
         #endregion Make        
